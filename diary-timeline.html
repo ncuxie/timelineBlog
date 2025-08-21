@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时之记 - 纯前端时间轴博客</title>
+    
+    <!-- External Scripts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 使用正确的 Lucide 图标库 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
+
+    <!-- Google Fonts for elegant typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles for the Zen theme */
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background-color: #FAF9F6; /* 米白色背景 */
+            color: #4a4a4a;
+        }
+
+        /* Timeline pseudo-elements for the central line */
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background-color: #e2e8f0;
+            z-index: 0;
+        }
+
+        /* Responsive timeline layout */
+        @media (max-width: 768px) {
+            .timeline-container::before {
+                left: 20px;
+            }
+            .timeline-item {
+                width: 100%;
+                padding-left: 50px;
+                padding-right: 1rem;
+            }
+            .timeline-item:nth-child(even) {
+                transform: translateX(0);
+            }
+            .timeline-item:nth-child(odd) .timeline-content {
+                text-align: left;
+            }
+            .timeline-dot {
+                left: 20px;
+            }
+        }
+
+        /* 图标样式 */
+        .lucide-icon {
+            width: 1rem;
+            height: 1rem;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-4xl">
+        
+        <!-- Header Section -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-700">时之记</h1>
+            <p class="text-gray-500 mt-2">记录当下，即是永恒</p>
+        </header>
+
+        <!-- Action Bar -->
+        <div class="flex flex-wrap gap-2 justify-center mb-8">
+            <button id="newPostBtn" class="bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 border border-gray-200 rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2">
+                <svg class="lucide-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8v8m-4-4h8"/>
+                </svg>
+                <span>新的篇章</span>
+            </button>
+            <div class="relative">
+                <input type="file" id="importFile" class="hidden" accept=".json">
+                <button id="importBtn" class="bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 border border-gray-200 rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2">
+                    <svg class="lucide-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7,10 12,15 17,10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>导入备份</span>
+                </button>
+            </div>
+            <button id="exportBtn" class="bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 border border-gray-200 rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2">
+                <svg class="lucide-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17,8 12,3 7,8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>导出备份</span>
+            </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="mb-10">
+            <div class="relative">
+                <input type="text" id="searchBox" placeholder="在时光中寻觅..." class="w-full p-3 pl-10 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all">
+                <svg class="lucide-icon absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Timeline Container -->
+        <main id="timeline" class="relative timeline-container py-8">
+            <!-- Timeline items will be injected here by JavaScript -->
+        </main>
+        
+        <!-- Placeholder for empty state -->
+        <div id="emptyState" class="text-center py-16 text-gray-500 hidden">
+            <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M2 6s1.5-2 5-2 5 2 5 2v14s-1.5-2-5-2-5 2-5 2V6z"/>
+                <path d="M12 6s1.5-2 5-2 5 2 5 2v14s-1.5-2-5-2-5 2-5 2V6z"/>
+            </svg>
+            <p>尚未留下任何小记。</p>
+            <p>点击"新的篇章"开始你的第一篇记录吧。</p>
+        </div>
+    </div>
+
+    <!-- Modal for New/Edit Post -->
+    <div id="postModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="p-6 border-b">
+                <h2 id="modalTitle" class="text-2xl font-bold text-gray-800">新的篇章</h2>
+            </div>
+            <form id="postForm" class="flex-grow flex flex-col overflow-hidden">
+                <input type="hidden" id="postId">
+                <div class="p-6 flex-grow overflow-y-auto">
+                    <div class="mb-4">
+                        <label for="postTitle" class="block text-gray-700 text-sm font-bold mb-2">标题</label>
+                        <input type="text" id="postTitle" class="shadow-inner appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-300" required>
+                    </div>
+                    <div>
+                        <label for="postContent" class="block text-gray-700 text-sm font-bold mb-2">内容 (支持 Markdown)</label>
+                        <textarea id="postContent" class="shadow-inner appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-300 h-64 resize-y" required></textarea>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-6 flex justify-end gap-4 border-t">
+                    <button type="button" id="cancelBtn" class="bg-white hover:bg-gray-100 text-gray-800 font-bold py-2 px-4 rounded-lg border border-gray-300 transition-all">取消</button>
+                    <button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg transition-all">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm">
+            <div class="p-6">
+                <h3 id="confirmTitle" class="text-lg font-bold text-gray-800 mb-2">确认操作</h3>
+                <p id="confirmMessage" class="text-gray-600">你确定要继续吗？</p>
+            </div>
+            <div class="bg-gray-50 p-4 flex justify-end gap-3">
+                <button id="confirmCancel" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 rounded-lg border border-gray-300">取消</button>
+                <button id="confirmOk" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main application script -->
+    <script>
+        // 等待所有脚本加载完成
+        window.addEventListener('load', () => {
+            // --- DOM ELEMENT REFERENCES ---
+            const newPostBtn = document.getElementById('newPostBtn');
+            const postModal = document.getElementById('postModal');
+            const postForm = document.getElementById('postForm');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const timeline = document.getElementById('timeline');
+            const emptyState = document.getElementById('emptyState');
+            const searchBox = document.getElementById('searchBox');
+            const exportBtn = document.getElementById('exportBtn');
+            const importBtn = document.getElementById('importBtn');
+            const importFile = document.getElementById('importFile');
+            
+            // --- INDEXEDDB SETUP ---
+            const DB_NAME = 'TimelineBlogDB';
+            const DB_VERSION = 1;
+            const STORE_NAME = 'posts';
+            let db;
+
+            function initDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                    request.onerror = (event) => {
+                        console.error('Database error:', event.target.errorCode);
+                        reject('Database error');
+                    };
+
+                    request.onsuccess = (event) => {
+                        db = event.target.result;
+                        console.log('Database initialized successfully.');
+                        resolve(db);
+                    };
+
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(STORE_NAME)) {
+                            const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                            objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+                            console.log('Object store created.');
+                        }
+                    };
+                });
+            }
+
+            // --- CRUD OPERATIONS ---
+            const crud = {
+                add: (post) => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.add(post);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                }),
+                getAll: () => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readonly');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const index = store.index('timestamp');
+                    const request = index.getAll();
+                    request.onsuccess = () => resolve(request.result.reverse()); // Newest first
+                    request.onerror = () => reject(request.error);
+                }),
+                get: (id) => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readonly');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.get(id);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                }),
+                update: (post) => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.put(post);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                }),
+                delete: (id) => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.delete(id);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                }),
+                clear: () => new Promise((resolve, reject) => {
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    const request = store.clear();
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                })
+            };
+            
+            // --- CUSTOM CONFIRM MODAL ---
+            const confirmModal = document.getElementById('confirmModal');
+            const confirmTitle = document.getElementById('confirmTitle');
+            const confirmMessage = document.getElementById('confirmMessage');
+            const confirmOk = document.getElementById('confirmOk');
+            const confirmCancel = document.getElementById('confirmCancel');
+            
+            function showConfirm(title, message) {
+                return new Promise((resolve) => {
+                    confirmTitle.textContent = title;
+                    confirmMessage.textContent = message;
+                    confirmModal.classList.remove('hidden');
+
+                    const onOk = () => {
+                        closeConfirm();
+                        resolve(true);
+                    };
+                    const onCancel = () => {
+                        closeConfirm();
+                        resolve(false);
+                    };
+                    
+                    const closeConfirm = () => {
+                        confirmModal.classList.add('hidden');
+                        confirmOk.removeEventListener('click', onOk);
+                        confirmCancel.removeEventListener('click', onCancel);
+                    };
+
+                    confirmOk.addEventListener('click', onOk);
+                    confirmCancel.addEventListener('click', onCancel);
+                });
+            }
+
+            // --- UI RENDERING ---
+            async function renderTimeline(filter = '') {
+                const posts = await crud.getAll();
+                timeline.innerHTML = '';
+
+                const filteredPosts = posts.filter(post => 
+                    post.title.toLowerCase().includes(filter.toLowerCase()) || 
+                    post.content.toLowerCase().includes(filter.toLowerCase())
+                );
+                
+                if (posts.length === 0 && filter === '') {
+                    emptyState.classList.remove('hidden');
+                    timeline.classList.add('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    timeline.classList.remove('hidden');
+                }
+
+                filteredPosts.forEach((post, index) => {
+                    const postDate = new Date(post.timestamp);
+                    const dateString = `${postDate.getFullYear()}年${postDate.getMonth() + 1}月${postDate.getDate()}日`;
+                    
+                    const postElement = document.createElement('div');
+                    postElement.className = 'timeline-item mb-8 flex justify-between items-center w-full';
+                    
+                    // Alternate sides on desktop
+                    if (index % 2 === 0) {
+                        postElement.classList.add('flex-row-reverse', 'md:flex-row');
+                    } else {
+                        postElement.classList.add('md:flex-row-reverse');
+                    }
+
+                    const contentHTML = `
+                        <div class="timeline-dot absolute w-4 h-4 bg-gray-400 rounded-full mt-1.5 -translate-x-1/2 z-10 border-4 border-white"></div>
+                        <div class="timeline-content w-full md:w-[calc(50%-2rem)] bg-white p-6 rounded-lg shadow-md border border-gray-100">
+                            <span class="font-bold text-sm text-gray-500">${dateString}</span>
+                            <h3 class="text-2xl font-bold mb-2 text-gray-800">${post.title}</h3>
+                            <div class="prose max-w-none text-gray-600">${marked.parse(post.content)}</div>
+                            <div class="mt-4 flex gap-2">
+                                <button data-id="${post.id}" class="edit-btn text-sm text-gray-500 hover:text-gray-800 transition-colors flex items-center gap-1">
+                                    <svg class="lucide-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                    </svg>
+                                    编辑
+                                </button>
+                                <button data-id="${post.id}" class="delete-btn text-sm text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                                    <svg class="lucide-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <polyline points="3,6 5,6 21,6"/>
+                                        <path d="m19,6v14a2,2 0,0,1-2,2H7a2,2 0,0,1-2-2V6m3,0V4a2,2 0,0,1,2-2h4a2,2 0,0,1,2,2v2"/>
+                                    </svg>
+                                    删除
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    postElement.innerHTML = contentHTML;
+                    timeline.appendChild(postElement);
+                });
+            }
+
+            // --- MODAL HANDLING ---
+            function openModal(post = null) {
+                postForm.reset();
+                if (post) {
+                    document.getElementById('modalTitle').textContent = '编辑篇章';
+                    document.getElementById('postId').value = post.id;
+                    document.getElementById('postTitle').value = post.title;
+                    document.getElementById('postContent').value = post.content;
+                } else {
+                    document.getElementById('modalTitle').textContent = '新的篇章';
+                    document.getElementById('postId').value = '';
+                }
+                postModal.classList.remove('hidden');
+            }
+
+            function closeModal() {
+                postModal.classList.add('hidden');
+            }
+
+            // --- EVENT LISTENERS ---
+            newPostBtn.addEventListener('click', () => openModal());
+            cancelBtn.addEventListener('click', closeModal);
+            postModal.addEventListener('click', (e) => {
+                if (e.target === postModal) closeModal();
+            });
+
+            postForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const id = document.getElementById('postId').value ? parseInt(document.getElementById('postId').value) : null;
+                const title = document.getElementById('postTitle').value;
+                const content = document.getElementById('postContent').value;
+
+                const post = {
+                    title,
+                    content,
+                    timestamp: new Date().getTime()
+                };
+
+                if (id) {
+                    const originalPost = await crud.get(id);
+                    post.id = id;
+                    post.timestamp = originalPost.timestamp; // Preserve original timestamp on edit
+                    await crud.update(post);
+                } else {
+                    await crud.add(post);
+                }
+                closeModal();
+                await renderTimeline(searchBox.value);
+            });
+
+            timeline.addEventListener('click', async (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+                
+                const id = parseInt(target.dataset.id);
+                if (target.classList.contains('edit-btn')) {
+                    const post = await crud.get(id);
+                    openModal(post);
+                } else if (target.classList.contains('delete-btn')) {
+                    const confirmed = await showConfirm('确认删除', '此操作无法撤销，确定要删除这篇记录吗？');
+                    if (confirmed) {
+                        await crud.delete(id);
+                        await renderTimeline(searchBox.value);
+                    }
+                }
+            });
+            
+            searchBox.addEventListener('input', (e) => {
+                renderTimeline(e.target.value);
+            });
+
+            // --- IMPORT/EXPORT ---
+            exportBtn.addEventListener('click', async () => {
+                const posts = await crud.getAll();
+                const dataStr = JSON.stringify(posts, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `timeline_backup_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            importBtn.addEventListener('click', () => importFile.click());
+            importFile.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const posts = JSON.parse(event.target.result);
+                        if (!Array.isArray(posts)) throw new Error("Invalid JSON format.");
+
+                        const confirmed = await showConfirm(
+                            '确认导入', 
+                            '这将清空所有现有记录并用备份文件中的内容替换。此操作无法撤销。'
+                        );
+
+                        if (confirmed) {
+                            await crud.clear();
+                            for (const post of posts) {
+                                // Ensure essential fields exist
+                                if (post.title && post.content && post.timestamp) {
+                                    const { id, ...postData } = post; // remove old id to allow auto-increment
+                                    await crud.add(postData);
+                                }
+                            }
+                            await renderTimeline();
+                        }
+                    } catch (error) {
+                        await showConfirm('导入失败', '文件格式无效或已损坏。请确保您选择的是正确的备份文件。');
+                        console.error('Import error:', error);
+                    } finally {
+                        importFile.value = ''; // Reset file input
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // --- INITIALIZATION ---
+            async function main() {
+			await initDB();
+			// 设置备份文件的URL，确保文件名正确
+			const backupUrl = 'C:\Users\dijkstrafrio\Downloads\timeline_backup_2025-08-21.json'; 
+			
+			try {
+				const response = await fetch(backupUrl);
+				if (response.ok) {
+					const posts = await response.json();
+					if (Array.isArray(posts) && posts.length > 0) {
+						// 清除现有数据并导入新数据
+						await crud.clear();
+						for (const post of posts) {
+							if (post.title && post.content && post.timestamp) {
+								const { id, ...postData } = post;
+								await crud.add(postData);
+							}
+						}
+						console.log('备份数据已成功自动导入。');
+					}
+				}
+			} catch (error) {
+				console.error('自动导入备份失败:', error);
+			}
+			
+			await renderTimeline();
+		}
+
+		main();
+        });
+    </script>
+</body>
+</html>
